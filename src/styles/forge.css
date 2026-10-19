@@ -1,0 +1,366 @@
+/*
+ * Archon Forge styles.
+ *
+ * Forge cannot rely on the host's Tailwind build: it only contains classes the
+ * host itself uses. Every rule here reads the host theme through
+ * `var(--archon-*)` (written by ThemeProvider, inherited through the
+ * floating window's `data-theme`), with dark fallbacks for hosts that predate
+ * the theme system.
+ *
+ * Contrast (verified for dark + bright): text.primary/secondary/muted on
+ * bg.shell, bg.surface-sunken and the selected tint ≥ 5.7:1; state.danger text
+ * is used on bg.shell only (4.7:1 dark / 4.8:1 bright).
+ */
+
+.af-root {
+  --af-bg: var(--archon-bg-shell, #0f172a);
+  --af-bg-sunken: var(--archon-bg-surface-sunken, #0b1224);
+  --af-bg-surface: var(--archon-bg-surface, #1e293b);
+  --af-bg-elevated: var(--archon-bg-surface-elevated, #334155);
+  --af-border: var(--archon-border-default, #334155);
+  --af-border-subtle: var(--archon-border-subtle, #1e293b);
+  --af-border-strong: var(--archon-border-strong, #475569);
+  --af-text: var(--archon-text-primary, #f8fafc);
+  --af-text-2: var(--archon-text-secondary, #e2e8f0);
+  --af-text-muted: var(--archon-text-muted, #94a3b8);
+  --af-text-disabled: var(--archon-text-disabled, #64748b);
+  --af-accent: var(--archon-accent-primary, #3b82f6);
+  --af-accent-hover: var(--archon-accent-primary-hover, #2563eb);
+  --af-accent-fg: var(--archon-accent-primary-fg, #ffffff);
+  --af-danger: var(--archon-state-danger, #ef4444);
+  --af-warning: var(--archon-state-warning, #f59e0b);
+  --af-success: var(--archon-state-success, #10b981);
+  --af-hover: var(--archon-state-hover, rgba(255, 255, 255, 0.05));
+  --af-selected: var(--archon-state-selected, rgba(59, 130, 246, 0.15));
+  --af-focus: var(--archon-state-focus-ring, #3b82f6);
+  --af-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  color: var(--af-text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.af-root *,
+.af-root *::before,
+.af-root *::after { box-sizing: border-box; }
+
+/* Zero specificity, so every component class below overrides the reset. */
+:where(.af-root) :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:where(.af-root) :where(button:disabled) { cursor: not-allowed; }
+.af-root :focus-visible { outline: 2px solid var(--af-focus); outline-offset: 1px; }
+
+.af-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.af-root ::-webkit-scrollbar-thumb { background: var(--af-border); }
+.af-root ::-webkit-scrollbar-thumb:hover { background: var(--af-border-strong); }
+
+/* ── Layout ─────────────────────────────────────────────── */
+
+.af-app { position: relative; display: flex; flex-direction: column; height: 100%; background: var(--af-bg); }
+.af-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.af-row { display: flex; align-items: center; gap: 8px; }
+.af-grow { flex: 1; min-width: 0; }
+.af-muted { color: var(--af-text-muted); }
+.af-mono { font-family: var(--af-mono); }
+.af-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── Buttons ────────────────────────────────────────────── */
+
+.af-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 30px; padding: 0 12px;
+  font-size: 12px; font-weight: 600;
+  border: 1px solid var(--af-border);
+  color: var(--af-text);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.af-btn:hover:not(:disabled) { background: var(--af-hover); border-color: var(--af-border-strong); }
+.af-btn:disabled { opacity: 0.5; }
+.af-btn--primary { background: var(--af-accent); border-color: var(--af-accent); color: var(--af-accent-fg); }
+.af-btn--primary:hover:not(:disabled) { background: var(--af-accent-hover); border-color: var(--af-accent-hover); }
+.af-btn--danger { border-color: var(--af-danger); color: var(--af-danger); }
+.af-btn--ghost { border-color: transparent; color: var(--af-text-2); }
+
+.af-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  color: var(--af-text-muted);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.af-icon-btn:hover:not(:disabled) { background: var(--af-hover); color: var(--af-text); }
+.af-icon-btn:disabled { opacity: 0.45; }
+.af-icon-btn[aria-pressed="true"] { background: var(--af-selected); color: var(--af-text); }
+
+/* ── Header slot (portaled into the host window header) ─── */
+
+.af-header { display: flex; align-items: center; gap: 2px; }
+.af-header__provider { display: flex; align-items: center; gap: 6px; max-width: 160px; margin-right: 4px; font-size: 11px; color: var(--af-text-muted); }
+.af-header__model { color: var(--af-text-2); }
+.af-header__sep { width: 1px; height: 16px; margin: 0 4px; background: var(--af-border); }
+.af-header__starting { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; font-size: 11px; color: var(--af-text-muted); }
+
+.af-badge {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  font-size: 10px; font-weight: 700; color: #ffffff;
+}
+
+/* ── Popover menu ───────────────────────────────────────── */
+
+.af-menu-anchor { position: relative; }
+.af-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 30;
+  min-width: 220px; padding: 4px;
+  background: var(--af-bg); border: 1px solid var(--af-border); box-shadow: var(--archon-shadow-md, 0 6px 16px rgba(0, 0, 0, 0.35));
+}
+.af-menu__title { padding: 6px 8px 4px; font-size: 11px; font-weight: 600; color: var(--af-text-muted); }
+.af-menu__item { display: flex; width: 100%; padding: 7px 8px; text-align: left; font-size: 12px; color: var(--af-text); }
+.af-menu__item:hover { background: var(--af-hover); }
+
+/* ── Context bar ────────────────────────────────────────── */
+
+.af-context {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; min-height: 32px;
+  border-bottom: 1px solid var(--af-border-subtle);
+  background: var(--af-bg-sunken);
+  font-size: 12px;
+}
+.af-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; color: var(--af-text-2); }
+.af-chip__label { color: var(--af-text-muted); }
+
+.af-banner {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--af-border-subtle);
+  font-size: 12px; color: var(--af-text-2);
+}
+.af-banner__icon { flex-shrink: 0; margin-top: 2px; }
+.af-banner--info .af-banner__icon { color: var(--af-accent); }
+.af-banner--warning .af-banner__icon { color: var(--af-warning); }
+.af-banner--danger .af-banner__icon { color: var(--af-danger); }
+
+/* ── Transcript ─────────────────────────────────────────── */
+
+.af-transcript { display: flex; flex-direction: column; gap: 14px; padding: 14px 12px; }
+
+.af-empty { padding: 12px; border: 1px dashed var(--af-border); }
+.af-empty__title { margin-bottom: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--af-text-muted); }
+.af-empty__item {
+  display: block; width: 100%; padding: 6px 8px; margin-top: 2px;
+  text-align: left; font-size: 12px; color: var(--af-text-2);
+}
+.af-empty__item:hover:not(:disabled) { background: var(--af-hover); color: var(--af-text); }
+
+.af-msg { display: flex; flex-direction: column; gap: 4px; }
+.af-msg__meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--af-text-muted); }
+.af-msg__role { font-weight: 700; color: var(--af-text-2); }
+.af-msg__body { white-space: pre-wrap; word-break: break-word; color: var(--af-text); }
+.af-msg--user { align-items: flex-end; }
+.af-msg--user .af-msg__body {
+  max-width: 88%; padding: 8px 10px;
+  background: var(--af-selected);
+  border: 1px solid var(--af-border-subtle);
+}
+.af-msg__thinking { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--af-text-muted); }
+
+.af-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.af-status--ok { color: var(--af-text-muted); }
+.af-status--ok svg { color: var(--af-success); }
+.af-status--stopped { color: var(--af-text-muted); }
+.af-status--stopped svg { color: var(--af-warning); }
+.af-status--error { color: var(--af-danger); }
+
+.af-error {
+  padding: 8px 10px;
+  border: 1px solid var(--af-danger);
+  border-left-width: 3px;
+  background: var(--af-bg);
+  font-size: 12px; color: var(--af-danger);
+}
+
+/* ── Markdown (model replies) ───────────────────────────────
+ * The host's Tailwind preflight strips heading sizes, list markers and
+ * margins, so every block element is styled explicitly. Text sits on bg.shell,
+ * code on bg.surface-sunken — both pairs ≥ 8.9:1 in dark and bright.
+ */
+
+.af-md { color: var(--af-text); word-break: break-word; }
+.af-md > :first-child { margin-top: 0; }
+.af-md > :last-child { margin-bottom: 0; }
+
+.af-md p,
+.af-md ul,
+.af-md ol,
+.af-md pre,
+.af-md blockquote,
+.af-md .af-md__table { margin: 0 0 8px; }
+
+.af-md h1,
+.af-md h2,
+.af-md h3,
+.af-md h4,
+.af-md h5,
+.af-md h6 { margin: 12px 0 6px; font-weight: 700; line-height: 1.3; color: var(--af-text); }
+.af-md h1 { font-size: 16px; }
+.af-md h2 { font-size: 15px; }
+.af-md h3 { font-size: 14px; }
+.af-md h4,
+.af-md h5,
+.af-md h6 { font-size: 13px; }
+
+.af-md strong { font-weight: 700; color: var(--af-text); }
+.af-md em { font-style: italic; }
+.af-md del { text-decoration: line-through; color: var(--af-text-muted); }
+
+.af-md ul,
+.af-md ol { padding-left: 20px; }
+.af-md ul { list-style: disc; }
+.af-md ol { list-style: decimal; }
+.af-md ul ul { list-style: circle; }
+.af-md li { margin: 2px 0; }
+.af-md li > ul,
+.af-md li > ol { margin: 2px 0 0; }
+.af-md li::marker { color: var(--af-text-muted); }
+.af-md li:has(> input[type="checkbox"]) { list-style: none; margin-left: -18px; }
+.af-md input[type="checkbox"] { margin: 0 6px 0 0; vertical-align: -1px; accent-color: var(--af-accent); }
+
+.af-md code {
+  padding: 1px 4px;
+  font-family: var(--af-mono); font-size: 12px;
+  color: var(--af-text);
+  background: var(--af-bg-sunken);
+  border: 1px solid var(--af-border-subtle);
+}
+.af-md pre {
+  padding: 8px 10px;
+  overflow-x: auto;
+  background: var(--af-bg-sunken);
+  border: 1px solid var(--af-border-subtle);
+}
+.af-md pre code {
+  padding: 0; border: 0; background: none;
+  font-size: 12px; line-height: 1.5; white-space: pre;
+}
+
+.af-md blockquote {
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid var(--af-accent);
+  color: var(--af-text-2);
+}
+
+.af-md hr { margin: 12px 0; border: 0; border-top: 1px solid var(--af-border); }
+
+.af-md .af-md__table { overflow-x: auto; }
+.af-md table { border-collapse: collapse; font-size: 12px; }
+.af-md th,
+.af-md td { padding: 4px 8px; text-align: left; vertical-align: top; border: 1px solid var(--af-border); }
+.af-md th { font-weight: 700; color: var(--af-text); background: var(--af-bg-sunken); }
+
+/* ── Tool trace ─────────────────────────────────────────── */
+
+.af-trace { font-size: 12px; }
+.af-trace__toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--af-text-muted); }
+.af-trace__toggle:hover { color: var(--af-text); }
+.af-trace__list { margin: 6px 0 0; padding: 0 0 0 10px; list-style: none; border-left: 1px solid var(--af-border); }
+.af-trace__item { padding: 3px 0; }
+.af-trace__name { display: flex; align-items: center; gap: 6px; font-family: var(--af-mono); font-size: 11px; color: var(--af-text-2); }
+.af-trace__name--error { color: var(--af-danger); }
+.af-trace__result {
+  margin-top: 2px; max-height: 96px; overflow-y: auto;
+  font-family: var(--af-mono); font-size: 11px; white-space: pre-wrap; word-break: break-word;
+  color: var(--af-text-muted);
+}
+
+/* ── Composer ───────────────────────────────────────────── */
+
+.af-composer { padding: 10px 12px 8px; border-top: 1px solid var(--af-border-subtle); background: var(--af-bg); }
+.af-composer__box { display: flex; align-items: flex-end; gap: 8px; }
+.af-composer__footer { margin-top: 6px; font-size: 11px; text-align: center; color: var(--af-text-muted); }
+
+.af-input,
+.af-textarea {
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit; font-size: 13px;
+  color: var(--af-text);
+  background: var(--af-bg-sunken);
+  border: 1px solid var(--af-border);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.af-textarea { resize: none; min-height: 40px; max-height: 160px; }
+.af-input::placeholder,
+.af-textarea::placeholder { color: var(--af-text-muted); opacity: 1; }
+.af-input:focus,
+.af-textarea:focus { border-color: var(--af-focus); }
+.af-input:disabled,
+.af-textarea:disabled { opacity: 0.6; }
+.af-input--invalid { border-color: var(--af-danger); }
+
+/* ── Wizard ─────────────────────────────────────────────── */
+
+.af-wizard__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-bottom: 1px solid var(--af-border-subtle); }
+.af-wizard__title { font-size: 14px; font-weight: 700; color: var(--af-text); }
+.af-wizard__steps { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--af-text-muted); }
+.af-wizard__bar { width: 18px; height: 3px; background: var(--af-border); }
+.af-wizard__bar--done { background: var(--af-success); }
+.af-wizard__bar--current { background: var(--af-accent); }
+.af-wizard__body { display: flex; flex-direction: column; gap: 14px; padding: 14px 12px; }
+.af-wizard__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--af-border-subtle); }
+
+.af-section__title { margin-bottom: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--af-text-muted); }
+
+.af-option {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; margin-bottom: 6px;
+  text-align: left;
+  border: 1px solid var(--af-border);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.af-option:hover:not(:disabled) { background: var(--af-hover); border-color: var(--af-border-strong); }
+.af-option[aria-checked="true"] { border-color: var(--af-accent); background: var(--af-selected); }
+.af-option:disabled { opacity: 1; }
+.af-option:disabled .af-option__name,
+.af-option:disabled .af-option__desc { color: var(--af-text-disabled); }
+.af-option:disabled .af-badge { opacity: 0.45; }
+.af-option__name { font-size: 13px; font-weight: 600; color: var(--af-text); }
+.af-option__desc { font-size: 12px; color: var(--af-text-muted); }
+.af-option__tag {
+  flex-shrink: 0; padding: 1px 6px;
+  font-size: 11px; font-weight: 600;
+  color: var(--af-text-muted);
+  border: 1px solid var(--af-border);
+}
+
+.af-segmented { display: flex; border: 1px solid var(--af-border); }
+.af-segmented__item { flex: 1; padding: 6px 8px; font-size: 12px; font-weight: 600; color: var(--af-text-muted); }
+.af-segmented__item[aria-checked="true"] { background: var(--af-selected); color: var(--af-text); }
+
+.af-field { display: flex; flex-direction: column; gap: 4px; }
+.af-field__label { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--af-text-2); }
+.af-field__required { font-size: 11px; font-weight: 500; color: var(--af-text-muted); }
+.af-field__hint { font-size: 11px; color: var(--af-text-muted); }
+
+.af-note { padding: 10px; border: 1px solid var(--af-border-subtle); background: var(--af-bg-sunken); }
+.af-note__title { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--af-text-muted); }
+.af-note__list { margin: 0; padding: 0 0 0 16px; font-size: 12px; color: var(--af-text-2); }
+.af-note__list li + li { margin-top: 4px; }
+
+.af-link { color: var(--af-accent); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Animations ─────────────────────────────────────────── */
+
+@keyframes afSpin { to { transform: rotate(360deg); } }
+.af-spin { animation: afSpin 0.9s linear infinite; }
+
+/* Settings need attention: red in every theme — a universal danger signal. */
+@keyframes afCogBlink {
+  0%, 100% { color: var(--af-danger); background: transparent; }
+  50% { color: #ffffff; background: var(--af-danger); }
+}
+.af-icon-btn--alert { animation: afCogBlink 1.4s ease-in-out infinite; color: var(--af-danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-spin { animation: none; }
+  .af-root .af-icon-btn--alert { animation: none; color: var(--af-danger); box-shadow: inset 0 0 0 1px var(--af-danger); }
+}

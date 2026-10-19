@@ -1,0 +1,15 @@
+{
+  "id": "archon-forge",
+  "name": "Archon Forge",
+  "version": "1.0.0",
+  "description": "Describe architecture changes in plain language — an LLM agent edits your ArchON project through archon-mcp running in your browser.",
+  "author": "Surecom",
+  "icon": "Wand2",
+  "main": "index.js",
+  "style": "style.css",
+  "visibility": "public",
+  "permissions": [
+    "project:read",
+    "project:write"
+  ]
+}
