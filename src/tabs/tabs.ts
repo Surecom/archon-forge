@@ -9,6 +9,7 @@
  * Tabs are per user and per browser (`localStorage`), never in the project.
  */
 import type { LayerSummary } from '../host/useHostContext';
+import { resolveBrandColor, type ThemeMode } from '../host/brandColors';
 
 export interface TabRecord {
   layerId: string;
@@ -71,14 +72,20 @@ export function syncTabs(tabs: TabRecord[], layers: Record<string, LayerSummary>
   return changed ? next : tabs;
 }
 
-export const resolveTabs = (projectKey: string, tabs: TabRecord[], layers: Record<string, LayerSummary>): LayerTab[] =>
+/** `mode` resolves a brand token left in a stored record (older Forge stored the raw token). */
+export const resolveTabs = (
+  projectKey: string,
+  tabs: TabRecord[],
+  layers: Record<string, LayerSummary>,
+  mode: ThemeMode = 'dark',
+): LayerTab[] =>
   tabs.map(t => {
     const layer = layers[t.layerId];
     return {
       key: tabKeyOf(projectKey, t.layerId),
       layerId: t.layerId,
       name: layer?.name ?? t.name,
-      color: layer?.color || t.color || FALLBACK_COLOR,
+      color: layer?.color || resolveBrandColor(t.color, mode) || FALLBACK_COLOR,
       available: !!layer,
     };
   });

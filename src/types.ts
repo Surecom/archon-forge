@@ -9,7 +9,7 @@
 export interface IntegrationLayerSnapshot {
   id: string;
   name: string;
-  /** User-chosen layer color — product data, never themed. */
+  /** Brand token (`'archon-blue'`, resolves per theme) or a custom CSS color — user data. */
   color: string;
   visibleElementIds: string[];
 }
@@ -73,6 +73,7 @@ export interface ArchonPluginAPI {
 
   getThemeId?(): string;
   getThemeMode?(): 'dark' | 'light';
+  subscribeToTheme?(cb: (info: { themeId: string; mode: 'dark' | 'light' }) => void): () => void;
   getLocale?(): 'en' | 'ru';
   subscribeToLocale?(cb: (locale: 'en' | 'ru') => void): () => void;
 }

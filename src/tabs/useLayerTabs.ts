@@ -25,8 +25,8 @@ interface ProjectTabs {
  * visit. Clicking a tab only changes what Forge shows; the chat in a tab
  * always edits that tab's layer.
  */
-export function useLayerTabs(host: Pick<HostContextState, 'projectKey' | 'layers' | 'selectedLayerId'>): LayerTabsState {
-  const { projectKey, layers, selectedLayerId } = host;
+export function useLayerTabs(host: Pick<HostContextState, 'projectKey' | 'layers' | 'selectedLayerId'> & { themeMode?: HostContextState['themeMode'] }): LayerTabsState {
+  const { projectKey, layers, selectedLayerId, themeMode } = host;
   const [state, setState] = useState<ProjectTabs>(() => ({ projectKey, records: loadTabs(projectKey), activeLayerId: null }));
 
   /** Every update starts from this project's tabs, even mid project switch. */
@@ -54,7 +54,7 @@ export function useLayerTabs(host: Pick<HostContextState, 'projectKey' | 'layers
   useEffect(() => { saveTabs(state.projectKey, state.records); }, [state.projectKey, state.records]);
 
   const current = state.projectKey === projectKey ? state : { projectKey, records: loadTabs(projectKey), activeLayerId: null };
-  const tabs = useMemo(() => resolveTabs(projectKey, current.records, layers), [projectKey, current.records, layers]);
+  const tabs = useMemo(() => resolveTabs(projectKey, current.records, layers, themeMode), [projectKey, current.records, layers, themeMode]);
   const active = tabs.find(t => t.layerId === current.activeLayerId) ?? tabs[0] ?? null;
 
   const select = useCallback((key: string) => {

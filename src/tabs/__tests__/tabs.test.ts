@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ensureTab, loadTabs, resolveTabs, saveTabs, syncTabs, tabKeyOf } from '../tabs';
 import { projectKeyOf } from '../../host/useHostContext';
+import { resolveBrandColor } from '../../host/brandColors';
 import type { ProjectState } from '../../types';
 
 const layer = (id: string, name = `Layer ${id}`, color = '#3b82f6') => ({ id, name, color });
@@ -53,6 +54,14 @@ describe('layer tabs', () => {
     expect(loadTabs('drive:B').map(t => t.layerId)).toEqual(['y']);
     saveTabs('drive:A', []);
     expect(loadTabs('drive:A')).toEqual([]);
+  });
+
+  it('resolves host brand-color tokens per theme — a token is not a CSS color', () => {
+    expect(resolveBrandColor('archon-blue', 'dark')).toBe('#3b82f6');
+    expect(resolveBrandColor('archon-blue', 'light')).toBe('#2563eb');
+    expect(resolveBrandColor('#123456', 'dark')).toBe('#123456');
+    const [tab] = resolveTabs('p', [{ layerId: 'gone', name: 'Old', color: 'archon-emerald' }], {}, 'light');
+    expect(tab.color).toBe('#059669');
   });
 
   it('keys projects by Drive file id, else by name', () => {

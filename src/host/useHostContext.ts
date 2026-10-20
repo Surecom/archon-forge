@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { ArchonPluginAPI, ProjectState } from '../types';
+import { resolveBrandColor, type ThemeMode } from './brandColors';
 
 export interface LayerSummary {
   id: string;
   name: string;
+  /** Paintable color for the active theme (brand tokens already resolved). */
   color: string;
 }
 
@@ -14,6 +16,7 @@ export interface HostContextState {
   layers: Record<string, LayerSummary>;
   readOnly: boolean;
   autoLayoutRunning: boolean;
+  themeMode: ThemeMode;
 }
 
 /**
@@ -26,12 +29,21 @@ export const projectKeyOf = (project: ProjectState): string =>
     ? `drive:${project.driveFileId}`
     : `local:${project.name ?? ''}`;
 
-const layersOf = (project: ProjectState): Record<string, LayerSummary> =>
-  Object.fromEntries(Object.values(project.integrationLayers ?? {}).map(l => [l.id, { id: l.id, name: l.name, color: l.color }]));
+const layersOf = (project: ProjectState, mode: ThemeMode): Record<string, LayerSummary> =>
+  Object.fromEntries(Object.values(project.integrationLayers ?? {}).map(l => [
+    l.id,
+    { id: l.id, name: l.name, color: resolveBrandColor(l.color, mode) },
+  ]));
+
+/** Older hosts without the theme API: the floating window carries `data-theme-mode`. */
+const themeModeOf = (api: ArchonPluginAPI): ThemeMode =>
+  api.getThemeMode?.()
+    ?? (document.querySelector('[data-theme-mode="light"]') ? 'light' : 'dark');
 
 const read = (api: ArchonPluginAPI): HostContextState => {
   const project = api.getProjectState();
-  const layers = layersOf(project);
+  const themeMode = themeModeOf(api);
+  const layers = layersOf(project, themeMode);
   const selected = api.getSelectedLayerId?.() ?? null;
   return {
     projectKey: projectKeyOf(project),
@@ -39,6 +51,7 @@ const read = (api: ArchonPluginAPI): HostContextState => {
     layers,
     readOnly: !!api.getIsViewMode?.(),
     autoLayoutRunning: !!api.getIsAutoLayoutRunning?.(),
+    themeMode,
   };
 };
 
@@ -51,7 +64,7 @@ const sameLayers = (a: Record<string, LayerSummary>, b: Record<string, LayerSumm
 const sameState = (a: HostContextState, b: HostContextState): boolean =>
   a.projectKey === b.projectKey && a.selectedLayerId === b.selectedLayerId
   && a.readOnly === b.readOnly && a.autoLayoutRunning === b.autoLayoutRunning
-  && sameLayers(a.layers, b.layers);
+  && a.themeMode === b.themeMode && sameLayers(a.layers, b.layers);
 
 /**
  * Live view of the host state Forge depends on. Every subscription is
@@ -71,6 +84,8 @@ export function useHostContext(api: ArchonPluginAPI): HostContextState & { refre
       api.subscribeToViewMode?.(refresh),
       api.subscribeToProjectChanges?.(refresh),
       api.subscribeToAutoLayoutRunning?.(refresh),
+      // Brand-token layer colors resolve differently per theme.
+      api.subscribeToTheme?.(refresh),
     ];
     refresh();
     return () => unsubscribers.forEach(unsubscribe => unsubscribe?.());
