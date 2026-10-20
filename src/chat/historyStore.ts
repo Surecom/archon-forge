@@ -3,8 +3,10 @@
  *
  *   db 'archon-forge' · store 'messages' { id, sessionId, order, role, content, ts, status?, appliedCount? }
  *
- * Only completed exchanges feed the model's history; cancelled and failed
- * turns stay visible in the transcript but are skipped when building context.
+ * One session per layer tab (`sessionId` = tab key: project + layer id), so
+ * tabs never read each other's messages. Only completed exchanges feed the
+ * model's history; cancelled and failed turns stay visible in the transcript
+ * but are skipped when building context.
  */
 import { openDB, type IDBPDatabase } from 'idb';
 
@@ -25,7 +27,6 @@ export interface StoredMessage {
 const DB_NAME = 'archon-forge';
 const DB_VERSION = 1;
 const STORE = 'messages';
-export const DEFAULT_SESSION_ID = 'default';
 
 let dbp: Promise<IDBPDatabase> | null = null;
 
@@ -50,13 +51,13 @@ export async function append(message: Omit<StoredMessage, 'id'>): Promise<void> 
   await db.add(STORE, message);
 }
 
-export async function loadSession(sessionId: string = DEFAULT_SESSION_ID): Promise<StoredMessage[]> {
+export async function loadSession(sessionId: string): Promise<StoredMessage[]> {
   const db = await getDb();
   const rows = await db.getAllFromIndex(STORE, 'bySession', sessionRange(sessionId)) as StoredMessage[];
   return rows.sort((a, b) => a.order - b.order);
 }
 
-export async function clearSession(sessionId: string = DEFAULT_SESSION_ID): Promise<void> {
+export async function clearSession(sessionId: string): Promise<void> {
   const db = await getDb();
   const tx = db.transaction(STORE, 'readwrite');
   let cursor = await tx.store.index('bySession').openCursor(sessionRange(sessionId));

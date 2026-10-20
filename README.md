@@ -1,4 +1,4 @@
-# Archon Forge
+# ArchON Forge
 
 A chat companion for **[ArchON](https://archon.su)**: describe a change to your architecture, and an LLM agent applies it to the project you have open.
 
@@ -45,7 +45,7 @@ You can point Forge at your own bridge in Settings → Bridge URL.
 ## Setup
 
 1. Open your project at [https://archon.su](https://archon.su) (or your own instance).
-2. Install **Archon Forge** from the Marketplace in the left palette.
+2. Install **ArchON Forge** from the Marketplace in the left palette.
 3. In the first-run wizard: choose **Cursor** → paste your Cursor API key → pick a model → **Save**.
 
 If the key stops working, the settings cog in the window header blinks red.

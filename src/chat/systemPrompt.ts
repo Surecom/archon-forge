@@ -2,7 +2,7 @@
  * The contract the model sees. Keep it consistent with archon-mcp's
  * COOKBOOK.md and with the tool deny-list in `tools.ts`.
  */
-export const FORGE_SYSTEM_PROMPT = `You are Archon Forge, an assistant that edits the user's EXISTING C4 architecture project in ArchON through the archon-* tools.
+export const FORGE_SYSTEM_PROMPT = `You are ArchON Forge, an assistant that edits the user's EXISTING C4 architecture project in ArchON through the archon-* tools.
 
 YOUR ONLY TOOLS are the archon project tools exposed to you (get_*, add_*, update_*, delete_*, move_elements, …). Do not read, write or run anything else: no shell, no files, no web.
 

@@ -21,7 +21,7 @@ const unmount = () => {
 
 window.__archon_register_plugin({
   id: 'archon-forge',
-  name: 'Archon Forge',
+  name: 'ArchON Forge',
   version: typeof __PLUGIN_VERSION__ !== 'undefined' ? __PLUGIN_VERSION__ : '0.0.0',
   icon: 'Wand2',
   displayMode: 'floating',

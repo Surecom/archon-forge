@@ -1,7 +1,7 @@
 {
   "id": "archon-forge",
-  "name": "Archon Forge",
-  "version": "1.0.0",
+  "name": "ArchON Forge",
+  "version": "1.1.3",
   "description": "Describe architecture changes in plain language — an LLM agent edits your ArchON project through archon-mcp running in your browser.",
   "author": "Surecom",
   "icon": "Wand2",
@@ -10,7 +10,7 @@
     "project:read",
     "project:write"
   ],
-  "longDescription": "# Archon Forge\n\nA chat companion for ArchON (https://archon.su): describe a change, and an LLM agent applies it to your current project.\n\n## How it works\n\n- **Your project stays in the browser.** `archon-mcp` runs as a Web Worker inside the page; every tool call the model makes executes there.\n- **One message = one undo step.** Everything a message changes is applied together after the model finishes, so Cmd/Ctrl+Z reverts the whole message. Stopping a run changes nothing.\n- **Your current layer.** New elements land on the integration layer you are looking at, unless your message names another one.\n- **Small asks stay small.** Forge is instructed to touch only what you mention — no silent re-layout, no tidying up.\n- **Layout is yours.** The model cannot run auto layout; use the layout button in the Forge window when you want it.\n\n## Providers\n\n- **Cursor** — a Cursor agent with the model of your choice, through the ArchON bridge. Bring your own Cursor API key.\n- Coming soon: DeepSeek, ChatGPT, Claude Code, on-prem LLMs (API key or login/password).\n\n## Privacy\n\n- Your API key is stored only in this browser's `localStorage` and sent with each request; the bridge holds it in memory for the duration of a run.\n- Chat history lives in this browser's `IndexedDB`; clear it from the window header.\n\n## Examples\n\n- \"Add a Payments system with an API and a database, and connect Orders API to it\"\n- \"Rename Orders API to Order Service and add Kafka to its technologies\"\n- \"Hide the Observability system on this layer\"",
+  "longDescription": "# ArchON Forge\n\nA chat companion for ArchON (https://archon.su): describe a change, and an LLM agent applies it to your current project.\n\n## How it works\n\n- **Your project stays in the browser.** `archon-mcp` runs as a Web Worker inside the page; every tool call the model makes executes there.\n- **One message = one undo step.** Everything a message changes is applied together after the model finishes, so Cmd/Ctrl+Z reverts the whole message. Stopping a run changes nothing.\n- **Your current layer.** New elements land on the integration layer you are looking at, unless your message names another one.\n- **Small asks stay small.** Forge is instructed to touch only what you mention — no silent re-layout, no tidying up.\n- **Layout is yours.** The model cannot run auto layout; use the layout button in the Forge window when you want it.\n\n## Providers\n\n- **Cursor** — a Cursor agent with the model of your choice, through the ArchON bridge. Bring your own Cursor API key.\n- Coming soon: DeepSeek, ChatGPT, Claude Code, on-prem LLMs (API key or login/password).\n\n## Privacy\n\n- Your API key is stored only in this browser's `localStorage` and sent with each request; the bridge holds it in memory for the duration of a run.\n- Chat history lives in this browser's `IndexedDB`; clear it from the window header.\n\n## Examples\n\n- \"Add a Payments system with an API and a database, and connect Orders API to it\"\n- \"Rename Orders API to Order Service and add Kafka to its technologies\"\n- \"Hide the Observability system on this layer\"",
   "tags": [
     "ai",
     "chat",

@@ -1,59 +1,78 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Eye, Layers, Loader2, RefreshCw, RotateCw, Send, Square, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eye, Loader2, MessageSquarePlus, RefreshCw, RotateCw, Send, Square, Trash2, XCircle } from 'lucide-react';
 import type { McpBootStatus } from '../ForgePlugin';
 import { useI18n, type MessageKey } from '../i18n';
+import type { LayerTab } from '../tabs/tabs';
 import ToolCallTrace from '../ui/ToolCallTrace';
 import Markdown from '../ui/Markdown';
 import type { ChatMessage, UseChatSession } from './useChatSession';
 
 interface Props {
   session: UseChatSession;
+  /** The tab whose chat is shown; `null` = no tab open for the current layer. */
+  tab: LayerTab | null;
+  tabBar: React.ReactNode;
+  /** Name of the tab running a turn when it is not this one. */
+  otherRunningTab: string | null;
+  /** Current host layer without an open tab (it was closed). */
+  closedCurrentLayer: string | null;
+  onOpenCurrent(): void;
+  onRemoveTab(tab: LayerTab): void;
   mcpStatus: McpBootStatus;
   mcpError?: string;
   onRetryMcp(): void;
-  layerName: string | null;
   readOnly: boolean;
 }
 
 const EXAMPLES: MessageKey[] = ['chat.example1', 'chat.example2', 'chat.example3'];
 
-const placeholderKey = (mcpStatus: McpBootStatus, readOnly: boolean): MessageKey =>
+const placeholderKey = (mcpStatus: McpBootStatus, readOnly: boolean, tab: LayerTab | null): MessageKey =>
   readOnly ? 'chat.placeholderViewMode'
-    : mcpStatus === 'error' ? 'chat.placeholderOffline'
-      : mcpStatus === 'ready' ? 'chat.placeholder'
-        : 'chat.placeholderBooting';
+    : tab && !tab.available ? 'error.layerDeleted'
+      : mcpStatus === 'error' ? 'chat.placeholderOffline'
+        : mcpStatus === 'ready' ? 'chat.placeholder'
+          : 'chat.placeholderBooting';
 
-const ChatView: React.FC<Props> = ({ session, mcpStatus, mcpError, onRetryMcp, layerName, readOnly }) => {
+const ChatView: React.FC<Props> = ({
+  session, tab, tabBar, otherRunningTab, closedCurrentLayer, onOpenCurrent, onRemoveTab,
+  mcpStatus, mcpError, onRetryMcp, readOnly,
+}) => {
   const { t } = useI18n();
-  const [draft, setDraft] = useState('');
-  // Sent while the worker was still booting; flushed once it is ready.
-  const [queued, setQueued] = useState<string | null>(null);
+  // Drafts belong to their tab, so switching layers never carries text across.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Sent while the worker was still booting; flushed in ITS tab once ready.
+  const [queued, setQueued] = useState<{ key: string; text: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, running, send } = session;
+  const tabKey = tab?.key ?? null;
+  const draft = tabKey ? drafts[tabKey] ?? '' : '';
+  const setDraft = (value: string) => { if (tabKey) setDrafts(d => ({ ...d, [tabKey]: value })); };
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, tabKey]);
 
   useEffect(() => {
-    if (mcpStatus === 'ready' && queued !== null && !running) {
+    if (!queued) return;
+    if (mcpStatus === 'ready' && !running && queued.key === tabKey) {
       setQueued(null);
-      void send(queued);
+      void send(queued.text);
     }
-    if (mcpStatus === 'error' && queued !== null) {
-      setDraft(d => d.trim() ? d : queued);
+    if (mcpStatus === 'error') {
+      setDrafts(d => ({ ...d, [queued.key]: d[queued.key]?.trim() ? d[queued.key] : queued.text }));
       setQueued(null);
     }
-  }, [mcpStatus, queued, running, send]);
+  }, [mcpStatus, queued, running, send, tabKey]);
 
-  const composerDisabled = readOnly || mcpStatus === 'error';
+  const ownRunning = !!tabKey && session.runningTabKey === tabKey;
+  const composerDisabled = readOnly || mcpStatus === 'error' || !tab || !tab.available || !!otherRunningTab;
 
-  const submit = (text = draft) => {
-    const value = text.trim();
-    if (!value || composerDisabled || running) return;
+  const submit = () => {
+    const value = draft.trim();
+    if (!value || composerDisabled || running || !tabKey) return;
     setDraft('');
-    if (mcpStatus !== 'ready') { setQueued(value); return; }
+    if (mcpStatus !== 'ready') { setQueued({ key: tabKey, text: value }); return; }
     void send(value);
   };
 
@@ -64,16 +83,25 @@ const ChatView: React.FC<Props> = ({ session, mcpStatus, mcpError, onRetryMcp, l
     }
   };
 
+  const queuedHere = queued !== null && queued.key === tabKey;
+
   return (
     <div className="af-app">
-      <div className="af-context">
-        <span className="af-chip af-grow">
-          <Layers size={13} className="af-muted" />
-          <span className="af-chip__label">{t('chat.layer')}:</span>
-          <span className="af-truncate">{layerName ?? t('chat.layerNone')}</span>
-        </span>
-      </div>
+      {tabBar}
 
+      {tab && !tab.available && (
+        <div className="af-banner af-banner--warning" role="status">
+          <AlertTriangle size={14} className="af-banner__icon" />
+          <span className="af-grow">{t('tabs.layerDeletedBanner', { layer: tab.name })}</span>
+          <button type="button" className="af-btn" onClick={() => onRemoveTab(tab)}><Trash2 size={12} />{t('tabs.remove')}</button>
+        </div>
+      )}
+      {otherRunningTab && (
+        <div className="af-banner af-banner--info" role="status">
+          <Loader2 size={14} className="af-banner__icon af-spin" />
+          <span>{t('tabs.otherRunning', { layer: otherRunningTab })}</span>
+        </div>
+      )}
       {readOnly && (
         <div className="af-banner af-banner--info" role="status">
           <Eye size={14} className="af-banner__icon" />
@@ -85,7 +113,7 @@ const ChatView: React.FC<Props> = ({ session, mcpStatus, mcpError, onRetryMcp, l
           <Loader2 size={14} className="af-banner__icon af-spin" />
           <span className="af-grow">
             {t('chat.engineStarting')}
-            {queued !== null && <><br /><span className="af-muted">{t('chat.queued')}</span></>}
+            {queuedHere && <><br /><span className="af-muted">{t('chat.queued')}</span></>}
           </span>
         </div>
       )}
@@ -102,7 +130,21 @@ const ChatView: React.FC<Props> = ({ session, mcpStatus, mcpError, onRetryMcp, l
 
       <div ref={scrollRef} className="af-scroll">
         <div className="af-transcript" aria-live="polite">
-          {messages.length === 0 && (
+          {!tab && (
+            <div className="af-placeholder">
+              {closedCurrentLayer ? (
+                <>
+                  <span>{t('tabs.closedCurrent', { layer: closedCurrentLayer })}</span>
+                  <button type="button" className="af-btn af-btn--primary" onClick={onOpenCurrent}>
+                    <MessageSquarePlus size={12} />{t('tabs.openCurrent')}
+                  </button>
+                </>
+              ) : (
+                <span>{t('tabs.noLayer')}</span>
+              )}
+            </div>
+          )}
+          {tab?.available && messages.length === 0 && (
             <div className="af-empty">
               <div className="af-empty__title">{t('chat.examplesTitle')}</div>
               {EXAMPLES.map(key => (
@@ -131,18 +173,18 @@ const ChatView: React.FC<Props> = ({ session, mcpStatus, mcpError, onRetryMcp, l
             rows={2}
             value={draft}
             disabled={composerDisabled}
-            placeholder={t(placeholderKey(mcpStatus, readOnly))}
-            aria-label={t(placeholderKey(mcpStatus, readOnly))}
+            placeholder={t(placeholderKey(mcpStatus, readOnly, tab))}
+            aria-label={t(placeholderKey(mcpStatus, readOnly, tab))}
             onChange={e => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
           />
-          {running ? (
+          {ownRunning ? (
             <button type="button" className="af-btn af-btn--danger" onClick={session.cancel} title={t('chat.stop')}>
               <Square size={12} />{t('chat.stop')}
             </button>
           ) : (
-            <button type="button" className="af-btn af-btn--primary" onClick={() => submit()} disabled={!draft.trim() || composerDisabled} title={t('chat.send')}>
-              {queued !== null ? <Loader2 size={12} className="af-spin" /> : <Send size={12} />}{t('chat.send')}
+            <button type="button" className="af-btn af-btn--primary" onClick={submit} disabled={!draft.trim() || composerDisabled || running} title={t('chat.send')}>
+              {queuedHere ? <Loader2 size={12} className="af-spin" /> : <Send size={12} />}{t('chat.send')}
             </button>
           )}
         </div>

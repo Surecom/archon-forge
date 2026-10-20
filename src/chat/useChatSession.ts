@@ -1,19 +1,25 @@
 /**
- * useChatSession — React state around `runTurn`.
+ * useChatSession — React state around `runTurn`, one conversation per layer tab.
  *
- *  - one turn at a time; every turn gets a token, and cancel / clear bump it so
- *    late events of a stopped turn are ignored;
+ *  - every tab has its own transcript (history session = tab key) and its own
+ *    provider session (agent conversation); nothing a tab sends to the model
+ *    comes from another tab;
+ *  - a tab's turn always edits that tab's layer, whatever the host has selected;
+ *  - one turn at a time across all tabs (they share the worker); every turn gets
+ *    a token, and cancel / clear bump it so late events of a stopped turn are
+ *    ignored;
  *  - the turn's operations are applied once, after the provider finished, as a
  *    single undo step labelled with the user's message;
  *  - a failed or cancelled turn changes nothing and can be retried.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ArchonPluginAPI } from '../types';
 import type { LLMProvider, ProviderSession, ToolSchema, TranscriptMessage } from '../providers/types';
 import { ProviderError } from '../providers/types';
 import type { McpClient } from '../mcp/mcpClient';
 import type { StateBridge } from '../mcp/stateBridge';
 import type { ForgeSettings } from '../settings/storage';
+import type { LayerTab } from '../tabs/tabs';
 import { useI18n, type Translator } from '../i18n';
 import * as history from './historyStore';
 import { FORGE_SYSTEM_PROMPT, contextBlock } from './systemPrompt';
@@ -35,15 +41,27 @@ export interface ChatMessage {
   error?: string;
 }
 
-export interface UseChatSession {
+interface TabChat {
   messages: ChatMessage[];
-  running: boolean;
   error: string | null;
+  loaded: boolean;
+  nextOrder: number;
+}
+
+export interface UseChatSession {
+  /** Messages of the active tab. */
+  messages: ChatMessage[];
+  error: string | null;
+  /** A turn is running in some tab (only one at a time). */
+  running: boolean;
+  /** Key of the tab whose turn is running. */
+  runningTabKey: string | null;
   canRetry: boolean;
   send(text: string): Promise<void>;
   retry(): Promise<void>;
   cancel(): void;
-  clear(): Promise<void>;
+  /** Deletes a tab's history and forgets its provider conversation. */
+  clearTab(key: string): Promise<void>;
 }
 
 interface Args {
@@ -53,9 +71,11 @@ interface Args {
   mcp: McpClient | null;
   bridge: StateBridge | null;
   readOnly: boolean;
-  selectedLayerId: string | null;
+  tab: LayerTab | null;
   onAuthError(): void;
 }
+
+const EMPTY_CHAT: TabChat = { messages: [], error: null, loaded: false, nextOrder: 1 };
 
 const LABEL_LENGTH = 60;
 const undoLabel = (text: string): string => {
@@ -92,76 +112,108 @@ const fromStored = (row: history.StoredMessage): ChatMessage => ({
 });
 
 export function useChatSession(args: Args): UseChatSession {
-  const { api, provider, settings, mcp, bridge, readOnly, selectedLayerId, onAuthError } = args;
+  const { api, provider, settings, mcp, bridge, readOnly, tab, onAuthError } = args;
   const { t } = useI18n();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [chats, setChats] = useState<Record<string, TabChat>>({});
+  const [runningTabKey, setRunningTabKey] = useState<string | null>(null);
   const tokenRef = useRef(0);
-  const orderRef = useRef(1);
-  const runningRef = useRef(false);
+  const runningRef = useRef<{ key: string; session: ProviderSession } | null>(null);
   const toolsRef = useRef<ToolSchema[] | null>(null);
+  const sessionsRef = useRef(new Map<string, ProviderSession>());
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
 
-  const session = useMemo<ProviderSession | null>(() => {
+  const patchChat = useCallback((key: string, patch: (c: TabChat) => Partial<TabChat>) => {
+    setChats(all => {
+      const current = all[key] ?? EMPTY_CHAT;
+      return { ...all, [key]: { ...current, ...patch(current) } };
+    });
+  }, []);
+
+  const patchMessage = useCallback((key: string, id: string, patch: (m: ChatMessage) => Partial<ChatMessage>) => {
+    patchChat(key, c => ({ messages: c.messages.map(m => (m.id === id ? { ...m, ...patch(m) } : m)) }));
+  }, [patchChat]);
+
+  // A provider or settings change starts every tab's conversation afresh.
+  useEffect(() => {
+    const sessions = sessionsRef.current;
+    return () => {
+      sessions.forEach(s => { void s.cancel(); });
+      sessions.clear();
+    };
+  }, [provider, settings]);
+
+  useEffect(() => { toolsRef.current = null; }, [mcp]);
+
+  const sessionFor = useCallback((key: string): ProviderSession | null => {
     if (!provider || !settings || provider.availability !== 'available') return null;
+    const existing = sessionsRef.current.get(key);
+    if (existing) return existing;
     try {
-      return provider.createSession({ credentials: settings.credentials, model: settings.model });
+      const created = provider.createSession({ credentials: settings.credentials, model: settings.model });
+      sessionsRef.current.set(key, created);
+      return created;
     } catch {
       return null;
     }
   }, [provider, settings]);
 
-  useEffect(() => () => { void session?.cancel(); }, [session]);
-  useEffect(() => { toolsRef.current = null; }, [mcp]);
-
+  // Load a tab's history the first time it is shown.
+  const tabKey = tab?.key ?? null;
   useEffect(() => {
+    if (!tabKey || chatsRef.current[tabKey]?.loaded) return;
     let alive = true;
-    history.loadSession().then(rows => {
+    history.loadSession(tabKey).then(rows => {
       if (!alive) return;
-      orderRef.current = (rows[rows.length - 1]?.order ?? 0) + 1;
-      setMessages(rows.map(fromStored));
-    }).catch(() => undefined);
+      patchChat(tabKey, c => c.loaded ? {} : {
+        messages: rows.map(fromStored),
+        loaded: true,
+        nextOrder: (rows[rows.length - 1]?.order ?? 0) + 1,
+      });
+    }).catch(() => patchChat(tabKey, () => ({ loaded: true })));
     return () => { alive = false; };
-  }, []);
+  }, [tabKey, patchChat]);
 
-  const patchMessage = useCallback((id: string, patch: (m: ChatMessage) => Partial<ChatMessage>) => {
-    setMessages(list => list.map(m => (m.id === id ? { ...m, ...patch(m) } : m)));
-  }, []);
-
-  const execute = useCallback(async (text: string, retry: boolean) => {
+  const execute = useCallback(async (target: LayerTab, text: string, retry: boolean) => {
     if (runningRef.current) return;
-    if (!provider || !settings || !session) { setError(t('error.notConfigured')); return; }
-    if (!mcp || !bridge) { setError(t('error.engineNotReady')); return; }
-    if (readOnly) { setError(t('error.viewMode')); return; }
-    if (api.getIsAutoLayoutRunning?.()) { setError(t('error.autoLayoutRunning')); return; }
+    const key = target.key;
+    const fail = (message: string) => patchChat(key, () => ({ error: message }));
+    const session = sessionFor(key);
+    if (!provider || !settings || !session) { fail(t('error.notConfigured')); return; }
+    if (!mcp || !bridge) { fail(t('error.engineNotReady')); return; }
+    if (readOnly) { fail(t('error.viewMode')); return; }
+    if (!target.available) { fail(t('error.layerDeleted')); return; }
+    if (api.getIsAutoLayoutRunning?.()) { fail(t('error.autoLayoutRunning')); return; }
 
-    runningRef.current = true;
-    setRunning(true);
-    setError(null);
+    runningRef.current = { key, session };
+    setRunningTabKey(key);
+    patchChat(key, () => ({ error: null }));
     const token = ++tokenRef.current;
     const isCancelled = () => tokenRef.current !== token;
 
-    const stored = await history.loadSession();
+    const stored = await history.loadSession(key);
+    const orderBase = Math.max(chatsRef.current[key]?.nextOrder ?? 1, (stored[stored.length - 1]?.order ?? 0) + 1);
+    const userOrder = orderBase;
+    const assistantOrder = retry ? orderBase : orderBase + 1;
+    patchChat(key, () => ({ nextOrder: assistantOrder + 1 }));
+
     if (!retry) {
-      const userOrder = orderRef.current++;
       const userMsg: ChatMessage = { id: `user-${userOrder}`, role: 'user', content: text, ts: Date.now() };
-      setMessages(list => [...list, userMsg]);
-      await history.append({ sessionId: history.DEFAULT_SESSION_ID, order: userOrder, role: 'user', content: text, ts: userMsg.ts });
+      patchChat(key, c => ({ messages: [...c.messages, userMsg] }));
+      await history.append({ sessionId: key, order: userOrder, role: 'user', content: text, ts: userMsg.ts });
     }
-    const assistantOrder = orderRef.current++;
     const assistantId = `assistant-${assistantOrder}`;
-    setMessages(list => [...list, { id: assistantId, role: 'assistant', content: '', ts: Date.now(), status: 'running', tools: [] }]);
+    patchChat(key, c => ({ messages: [...c.messages, { id: assistantId, role: 'assistant', content: '', ts: Date.now(), status: 'running', tools: [] }] }));
 
     const finish = async (patch: Partial<ChatMessage>) => {
-      patchMessage(assistantId, () => patch);
-      const status = (patch.status ?? 'finished') as history.TurnStatus;
+      patchMessage(key, assistantId, () => patch);
       await history.append({
-        sessionId: history.DEFAULT_SESSION_ID,
+        sessionId: key,
         order: assistantOrder,
         role: 'assistant',
         content: patch.content ?? '',
         ts: Date.now(),
-        status,
+        status: (patch.status ?? 'finished') as history.TurnStatus,
         appliedCount: patch.appliedCount,
       }).catch(() => undefined);
     };
@@ -169,16 +221,15 @@ export function useChatSession(args: Args): UseChatSession {
     let content = '';
     try {
       if (!toolsRef.current) toolsRef.current = toModelTools(await mcp.listTools());
-      const layer = selectedLayerId ? api.getProjectState().integrationLayers?.[selectedLayerId] ?? null : null;
       const transcriptRows = retry ? stored.slice(0, stored.map(r => r.role).lastIndexOf('user')) : stored;
 
       const outcome = await runTurn(
         {
           systemPrompt: FORGE_SYSTEM_PROMPT,
           history: transcriptOf(transcriptRows),
-          message: `${contextBlock(layer)}\n\n${text}`,
+          message: `${contextBlock({ name: target.name })}\n\n${text}`,
           tools: toolsRef.current,
-          context: { currentLayerId: layer ? selectedLayerId : null },
+          context: { currentLayerId: target.layerId },
           retry,
         },
         { mcp, bridge, session, isCancelled },
@@ -186,12 +237,12 @@ export function useChatSession(args: Args): UseChatSession {
           onText: delta => {
             if (isCancelled()) return;
             content += delta;
-            patchMessage(assistantId, () => ({ content }));
+            patchMessage(key, assistantId, () => ({ content }));
           },
-          onThinking: thinking => { if (!isCancelled()) patchMessage(assistantId, () => ({ thinking })); },
-          onToolCall: call => { if (!isCancelled()) patchMessage(assistantId, m => ({ tools: [...(m.tools ?? []), call] })); },
+          onThinking: thinking => { if (!isCancelled()) patchMessage(key, assistantId, () => ({ thinking })); },
+          onToolCall: call => { if (!isCancelled()) patchMessage(key, assistantId, m => ({ tools: [...(m.tools ?? []), call] })); },
           onToolResult: done => {
-            if (!isCancelled()) patchMessage(assistantId, m => ({ tools: (m.tools ?? []).map(c => (c.callId === done.callId ? done : c)) }));
+            if (!isCancelled()) patchMessage(key, assistantId, m => ({ tools: (m.tools ?? []).map(c => (c.callId === done.callId ? done : c)) }));
           },
         },
       );
@@ -211,51 +262,58 @@ export function useChatSession(args: Args): UseChatSession {
           applyError = t('chat.applyFailed', { reason: (err as Error)?.message ?? String(err) });
         }
       }
-      await finish({
-        content: outcome.text,
-        status: applyError ? 'error' : 'finished',
-        appliedCount,
-        error: applyError,
-        thinking: undefined,
-      });
+      await finish({ content: outcome.text, status: applyError ? 'error' : 'finished', appliedCount, error: applyError, thinking: undefined });
     } catch (err) {
       console.error('[archon-forge] turn failed:', err);
       if (err instanceof ProviderError && err.code === 'auth') onAuthError();
-      const message = describeError(err, t);
-      await finish({ content, status: isCancelled() ? 'cancelled' : 'error', error: isCancelled() ? undefined : message, thinking: undefined });
+      await finish({
+        content,
+        status: isCancelled() ? 'cancelled' : 'error',
+        error: isCancelled() ? undefined : describeError(err, t),
+        thinking: undefined,
+      });
     } finally {
-      runningRef.current = false;
-      setRunning(false);
+      runningRef.current = null;
+      setRunningTabKey(null);
     }
-  }, [api, provider, settings, session, mcp, bridge, readOnly, selectedLayerId, onAuthError, patchMessage, t]);
+  }, [api, provider, settings, mcp, bridge, readOnly, sessionFor, onAuthError, patchChat, patchMessage, t]);
 
-  const send = useCallback((text: string) => execute(text.trim(), false), [execute]);
-
+  const chat = (tabKey && chats[tabKey]) || EMPTY_CHAT;
+  const messages = chat.messages;
+  const running = runningTabKey !== null;
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
-  const lastAssistant = messages[messages.length - 1];
-  const canRetry = !running && !!lastUser && lastAssistant?.role === 'assistant'
-    && (lastAssistant.status === 'cancelled' || lastAssistant.status === 'error');
+  const lastMessage = messages[messages.length - 1];
+  const canRetry = !running && !!tab?.available && !!lastUser && lastMessage?.role === 'assistant'
+    && (lastMessage.status === 'cancelled' || lastMessage.status === 'error');
+
+  const send = useCallback(async (text: string) => {
+    if (tab) await execute(tab, text.trim(), false);
+  }, [tab, execute]);
 
   const retry = useCallback(async () => {
-    if (!canRetry || !lastUser) return;
-    setMessages(list => list.slice(0, -1));
-    await execute(lastUser.content, true);
-  }, [canRetry, lastUser, execute]);
+    if (!tab || !canRetry || !lastUser) return;
+    patchChat(tab.key, c => ({ messages: c.messages.slice(0, -1) }));
+    await execute(tab, lastUser.content, true);
+  }, [tab, canRetry, lastUser, execute, patchChat]);
 
   const cancel = useCallback(() => {
-    if (!runningRef.current) return;
+    const active = runningRef.current;
+    if (!active) return;
     tokenRef.current += 1;
-    void session?.cancel();
-  }, [session]);
+    void active.session.cancel();
+  }, []);
 
-  const clear = useCallback(async () => {
-    cancel();
-    await history.clearSession();
+  const clearTab = useCallback(async (key: string) => {
+    if (runningRef.current?.key === key) cancel();
+    await history.clearSession(key);
+    const session = sessionsRef.current.get(key);
     session?.reset();
-    orderRef.current = 1;
-    setMessages([]);
-    setError(null);
-  }, [cancel, session]);
+    sessionsRef.current.delete(key);
+    setChats(all => {
+      const { [key]: _removed, ...rest } = all;
+      return rest;
+    });
+  }, [cancel]);
 
-  return { messages, running, error, canRetry, send, retry, cancel, clear };
+  return { messages, error: chat.error, running, runningTabKey, canRetry, send, retry, cancel, clearTab };
 }

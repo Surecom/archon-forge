@@ -9,11 +9,15 @@
 export interface IntegrationLayerSnapshot {
   id: string;
   name: string;
+  /** User-chosen layer color — product data, never themed. */
+  color: string;
   visibleElementIds: string[];
 }
 
 export interface ProjectState {
   name: string;
+  /** Ephemeral host field; present for Drive-backed projects. */
+  driveFileId?: string;
   systems: Record<string, unknown>;
   containers: Record<string, unknown>;
   users: Record<string, unknown>;

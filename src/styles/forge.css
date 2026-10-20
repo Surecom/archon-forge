@@ -1,5 +1,5 @@
 /*
- * Archon Forge styles.
+ * ArchON Forge styles.
  *
  * Forge cannot rely on the host's Tailwind build: it only contains classes the
  * host itself uses. Every rule here reads the host theme through
@@ -116,17 +116,106 @@
 .af-menu__item { display: flex; width: 100%; padding: 7px 8px; text-align: left; font-size: 12px; color: var(--af-text); }
 .af-menu__item:hover { background: var(--af-hover); }
 
-/* ── Context bar ────────────────────────────────────────── */
+/* ── Layer tabs ─────────────────────────────────────────────
+ * The layer color is user data: it tints the tab and draws the stripe and the
+ * dot, while the label stays on theme text tokens (an arbitrary user color
+ * cannot be trusted to keep 4.5:1 as text). The tint is ≤ 22% of the color
+ * over bg.shell, so text.primary keeps ≥ 8:1 in both themes for any color
+ * (worst case: pure black on bright).
+ */
 
-.af-context {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 12px; min-height: 32px;
-  border-bottom: 1px solid var(--af-border-subtle);
+.af-tabs {
+  display: flex; align-items: stretch; gap: 2px;
+  min-height: 34px; padding: 4px 6px 0;
+  overflow-x: auto; overflow-y: hidden;
   background: var(--af-bg-sunken);
-  font-size: 12px;
+  border-bottom: 1px solid var(--af-border-subtle);
+  scrollbar-width: thin;
 }
-.af-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; color: var(--af-text-2); }
-.af-chip__label { color: var(--af-text-muted); }
+
+.af-tab {
+  --af-tab-color: var(--af-text-muted);
+  display: flex; align-items: center; flex-shrink: 0;
+  max-width: 180px;
+  background: color-mix(in srgb, var(--af-tab-color) 8%, var(--af-bg-sunken));
+  border: 1px solid var(--af-border-subtle);
+  border-bottom: 0;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--af-tab-color) 45%, transparent);
+}
+.af-tab--active {
+  background: color-mix(in srgb, var(--af-tab-color) 22%, var(--af-bg));
+  border-color: color-mix(in srgb, var(--af-tab-color) 55%, var(--af-border));
+  box-shadow: inset 0 -2px 0 var(--af-tab-color);
+}
+.af-tab__main {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 0 4px 0 9px; height: 29px;
+  font-size: 12px; font-weight: 600; color: var(--af-text-2);
+}
+.af-tab--active .af-tab__main { color: var(--af-text); }
+.af-tab__dot { width: 8px; height: 8px; flex-shrink: 0; background: var(--af-tab-color); border-radius: 50%; }
+.af-tab__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-tab__close {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 22px; height: 22px; margin-right: 3px;
+  color: var(--af-text-muted);
+}
+.af-tab__close:hover { background: var(--af-hover); color: var(--af-text); }
+
+/* Deleted layer: grey, still readable and removable. */
+.af-tab--deleted {
+  --af-tab-color: var(--af-text-disabled);
+  background: var(--af-bg-sunken);
+  box-shadow: none;
+}
+.af-tab--deleted .af-tab__name { text-decoration: line-through; text-decoration-color: var(--af-text-disabled); }
+.af-tab--deleted .af-tab__main { color: var(--af-text-muted); }
+
+/* ── In-plugin confirmation dialog ──────────────────────── */
+
+.af-shell { position: relative; height: 100%; }
+.af-dialog__scrim {
+  position: absolute; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: var(--archon-overlay-scrim, rgba(2, 6, 23, 0.6));
+}
+.af-dialog {
+  width: 100%; max-width: 340px; padding: 14px;
+  background: var(--af-bg);
+  border: 1px solid var(--af-border);
+  box-shadow: var(--archon-shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.45));
+}
+.af-dialog__title { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; font-weight: 700; color: var(--af-text); }
+.af-dialog__icon { flex-shrink: 0; margin-top: 2px; color: var(--af-danger); }
+.af-dialog__icon--primary { color: var(--af-warning); }
+.af-dialog__body { margin: 8px 0 14px; font-size: 12px; color: var(--af-text-2); }
+
+/* "What exactly / where" — the part the user must not miss. */
+.af-dialog__subject {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center;
+  margin: 12px 0 0; padding: 10px;
+  background: var(--af-bg-sunken);
+  border: 1px solid var(--af-border);
+  border-left: 3px solid var(--af-accent);
+}
+.af-dialog__subject dt { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--af-text-muted); }
+.af-dialog__subject dd { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 0; font-size: 13px; color: var(--af-text); }
+.af-dialog__subject strong { font-weight: 700; overflow-wrap: anywhere; }
+.af-dialog__swatch {
+  width: 12px; height: 12px; flex-shrink: 0;
+  background: var(--af-subject-color);
+  box-shadow: 0 0 0 1px var(--af-border-strong);
+}
+.af-dialog__warning {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin: -6px 0 14px;
+  font-size: 12px; font-weight: 600; color: var(--af-text);
+}
+.af-dialog__warning svg { flex-shrink: 0; margin-top: 2px; color: var(--af-warning); }
+.af-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.af-placeholder { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px; border: 1px dashed var(--af-border); color: var(--af-text-2); font-size: 12px; }
 
 .af-banner {
   display: flex; align-items: flex-start; gap: 8px;

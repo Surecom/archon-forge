@@ -18,7 +18,8 @@ interface Props {
   /** `undefined` = the host has no auto-layout API. */
   autoLayout?: { disabled: boolean; running: boolean; run(engine: AutoLayoutEngineId): void };
   onOpenSettings(): void;
-  onClearHistory(): void;
+  /** Clears the active tab's chat; omitted when there is no tab. */
+  onClearHistory?(): void;
 }
 
 const ENGINES: { id: AutoLayoutEngineId; label: 'header.autoLayoutCompact' | 'header.autoLayoutOrthogonal' }[] = [
@@ -96,9 +97,11 @@ const WindowHeaderSlot: React.FC<Props> = ({ provider, model, invalid, booting, 
         </span>
       )}
       {autoLayout && <AutoLayoutMenu {...autoLayout} />}
-      <button type="button" className="af-icon-btn" title={t('header.clearHistory')} aria-label={t('header.clearHistory')} onClick={onClearHistory}>
-        <Trash2 size={14} />
-      </button>
+      {onClearHistory && (
+        <button type="button" className="af-icon-btn" title={t('header.clearHistory')} aria-label={t('header.clearHistory')} onClick={onClearHistory}>
+          <Trash2 size={14} />
+        </button>
+      )}
       <button
         type="button"
         className={`af-icon-btn${invalid ? ' af-icon-btn--alert' : ''}`}

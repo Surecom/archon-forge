@@ -11,9 +11,18 @@ import { disposeArchonMcpWorker, getArchonMcpWorker } from './mcp/workerLoader';
 import { createMcpClient, McpClient } from './mcp/mcpClient';
 import { createStateBridge, StateBridge } from './mcp/stateBridge';
 import { useHostContext } from './host/useHostContext';
-import { I18nProvider, useI18n } from './i18n';
+import { useLayerTabs } from './tabs/useLayerTabs';
+import type { LayerTab } from './tabs/tabs';
+import TabBar from './ui/TabBar';
+import ConfirmDialog, { type ConfirmRequest } from './ui/ConfirmDialog';
+import { I18nProvider, useI18n, type MessageKey } from './i18n';
 
 export type McpBootStatus = 'idle' | 'booting' | 'ready' | 'error';
+
+const ENGINE_LABELS: Record<AutoLayoutEngineId, MessageKey> = {
+  'compact-grid': 'header.autoLayoutCompact',
+  'orthogonal-flow': 'header.autoLayoutOrthogonal',
+};
 
 /** Hard ceiling for worker fetch + RPC initialize, so a hang becomes a Retry button. */
 const BOOT_TIMEOUT_MS = 60_000;
@@ -90,6 +99,8 @@ const ForgeApp: React.FC<{ api: ArchonPluginAPI }> = ({ api }) => {
   useEffect(() => { setHeaderEl(api.getWindowHeaderContainer?.() ?? null); }, [api]);
 
   const openSettings = useCallback(() => setEditing(true), []);
+  const tabs = useLayerTabs(host);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   const session = useChatSession({
     api,
@@ -98,16 +109,66 @@ const ForgeApp: React.FC<{ api: ArchonPluginAPI }> = ({ api }) => {
     mcp: engine?.mcp ?? null,
     bridge: engine?.bridge ?? null,
     readOnly: host.readOnly,
-    selectedLayerId: host.selectedLayerId,
+    tab: tabs.active,
     onAuthError: openSettings,
   });
 
-  const runAutoLayout = useCallback(async (engineId: AutoLayoutEngineId) => {
-    const result = await api.runAutoLayout?.({ engine: engineId, layerId: host.selectedLayerId });
-    if (result && result.status !== 'applied' && result.status !== 'noop' && result.status !== 'cancelled') {
-      api.showNotification(t('header.autoLayoutFailed', { reason: result.error ?? result.reason ?? result.status }), 'warning');
-    }
-  }, [api, host.selectedLayerId, t]);
+  // Auto layout works on the layer of the tab the user is looking at — which
+  // may differ from the one on screen, so it is always confirmed first.
+  const layoutLayerId = tabs.active?.available ? tabs.active.layerId : host.selectedLayerId;
+  const layoutLayer = layoutLayerId ? host.layers[layoutLayerId] ?? null : null;
+  const askAutoLayout = useCallback((engineId: AutoLayoutEngineId) => {
+    if (!layoutLayer) return;
+    setConfirm({
+      title: t('confirm.layoutTitle'),
+      body: t('confirm.layoutBody'),
+      tone: 'primary',
+      subject: [
+        { label: t('confirm.layer'), value: layoutLayer.name, color: layoutLayer.color },
+        { label: t('confirm.layoutEngine'), value: t(ENGINE_LABELS[engineId]) },
+      ],
+      warning: layoutLayer.id !== host.selectedLayerId ? t('confirm.layoutNotShown') : undefined,
+      onConfirm: () => {
+        setConfirm(null);
+        void api.runAutoLayout?.({ engine: engineId, layerId: layoutLayer.id }).then(result => {
+          if (result.status !== 'applied' && result.status !== 'noop' && result.status !== 'cancelled') {
+            api.showNotification(t('header.autoLayoutFailed', { reason: result.error ?? result.reason ?? result.status }), 'warning');
+          }
+        });
+      },
+    });
+  }, [api, layoutLayer, host.selectedLayerId, t]);
+
+  const layerSubject = (tab: LayerTab) => [{ label: t('confirm.layer'), value: tab.name, color: tab.available ? tab.color : undefined }];
+
+  const askCloseTab = useCallback((tab: LayerTab) => setConfirm({
+    title: t('confirm.closeTitle', { layer: tab.name }),
+    body: t('confirm.closeBody'),
+    subject: layerSubject(tab),
+    onConfirm: () => {
+      setConfirm(null);
+      tabs.close(tab.key);
+      void session.clearTab(tab.key);
+    },
+  }), [t, tabs, session]);
+
+  const askClearTab = useCallback(() => {
+    const tab = tabs.active;
+    if (!tab) return;
+    setConfirm({
+      title: t('confirm.clearTitle', { layer: tab.name }),
+      body: t('confirm.clearBody'),
+      subject: layerSubject(tab),
+      onConfirm: () => {
+        setConfirm(null);
+        void session.clearTab(tab.key);
+      },
+    });
+  }, [t, tabs.active, session]);
+
+  const runningTab = tabs.tabs.find(tab => tab.key === session.runningTabKey) ?? null;
+  const otherRunningTab = runningTab && runningTab.key !== tabs.active?.key ? runningTab.name : null;
+  const closedCurrentLayer = tabs.canOpenCurrent && host.selectedLayerId ? host.layers[host.selectedLayerId]?.name ?? null : null;
 
   const complete = useCallback((next: ForgeSettings) => {
     saveSettings(next);
@@ -118,7 +179,8 @@ const ForgeApp: React.FC<{ api: ArchonPluginAPI }> = ({ api }) => {
   const showWizard = !valid || editing;
 
   return (
-    <div className="af-root" style={{ height: '100%' }}>
+    // Re-read layer names by ID whenever the user comes back to the window.
+    <div className="af-root af-shell" onFocusCapture={host.refresh} onPointerEnter={host.refresh}>
       {headerEl && ReactDOM.createPortal(
         <WindowHeaderSlot
           provider={valid ? provider : null}
@@ -126,12 +188,12 @@ const ForgeApp: React.FC<{ api: ArchonPluginAPI }> = ({ api }) => {
           invalid={!valid}
           booting={valid && status === 'booting'}
           autoLayout={api.runAutoLayout ? {
-            disabled: host.readOnly || session.running,
+            disabled: host.readOnly || session.running || !layoutLayer,
             running: host.autoLayoutRunning,
-            run: engineId => { void runAutoLayout(engineId); },
+            run: askAutoLayout,
           } : undefined}
           onOpenSettings={openSettings}
-          onClearHistory={() => { void session.clear(); }}
+          onClearHistory={tabs.active && !showWizard ? askClearTab : undefined}
         />,
         headerEl,
       )}
@@ -140,13 +202,27 @@ const ForgeApp: React.FC<{ api: ArchonPluginAPI }> = ({ api }) => {
       ) : (
         <ChatView
           session={session}
+          tab={tabs.active}
+          tabBar={(
+            <TabBar
+              tabs={tabs.tabs}
+              activeKey={tabs.active?.key ?? null}
+              runningKey={session.runningTabKey}
+              onSelect={tabs.select}
+              onClose={askCloseTab}
+            />
+          )}
+          otherRunningTab={otherRunningTab}
+          closedCurrentLayer={closedCurrentLayer}
+          onOpenCurrent={tabs.openCurrent}
+          onRemoveTab={askCloseTab}
           mcpStatus={status}
           mcpError={error ?? undefined}
           onRetryMcp={retry}
-          layerName={host.layerName}
           readOnly={host.readOnly}
         />
       )}
+      {confirm && <ConfirmDialog {...confirm} onCancel={() => setConfirm(null)} />}
     </div>
   );
 };

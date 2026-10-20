@@ -7,7 +7,8 @@ const pkg = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'ut
 
 export default defineConfig({
   define: {
-    'process.env.NODE_ENV': JSON.stringify('production'),
+    // Tests need React's development build (it is the one exporting `act`).
+    ...(process.env.VITEST ? {} : { 'process.env.NODE_ENV': JSON.stringify('production') }),
     '__PLUGIN_VERSION__': JSON.stringify(pkg.version),
   },
   plugins: [
