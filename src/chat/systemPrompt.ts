@@ -1,3 +1,5 @@
+import type { Locale } from '../i18n';
+
 /**
  * The contract the model sees. Keep it consistent with archon-mcp's
  * COOKBOOK.md and with the tool deny-list in `tools.ts`.
@@ -32,9 +34,23 @@ RELATIONSHIP RULES — the archon tools enforce them; read the "Rules applied" a
 - If an item is rejected, resend it with the missing endpoints, schemas, topics (with role) or description. Tell the user which relationships were rewritten or merged.
 - validate_relationships without fix only reports. Pass fix:true ONLY when the user explicitly asks to fix or normalize relationships.
 
-ANSWER in the language of the user's message. Be brief: say what you changed (names), or what you need to know. Your reply is rendered as Markdown (GFM): use short lists, **bold** for element names, \`code\` for technical ids, and tables only when comparing several elements. No HTML.`;
+LANGUAGE — the user's ArchON UI language decides, nothing else:
+- The <context> block names the UI language. Write your replies, your reasoning and every NEW user-facing text you create (names and descriptions of systems, containers, users, groups, layers, scenarios and steps, relationship descriptions, comments) in that language.
+- The language of these instructions, of the tool descriptions and tool results, of the existing project content and of the user's message does NOT change it.
+- Only an explicit request switches it ("make the diagram in Russian", "answer in English"). It applies to what the user named — the diagram content, the replies, or both — and holds for the rest of this conversation until the user asks for another language.
+- Never translate existing names or descriptions unless the user asks for it.
+- ALWAYS English, whatever the language: technical terms and anchors — container types (App, DB, Bus), topic roles, technologies, products and protocols (PostgreSQL, Kafka, Spring Boot, REST, gRPC), HTTP methods and API paths, schema, table, topic, queue and port names, code-style identifiers (order-service, user_id), tool and argument names. Example in Russian: name "Сервис заказов", technology "Java, Spring Boot", endpoint "POST /v1/orders", topic "order.created", description "Создаёт заказ — POST /v1/orders".
 
-export function contextBlock(layer: { name: string } | null): string {
+ANSWER briefly: say what you changed (names), or what you need to know. Your reply is rendered as Markdown (GFM): use short lists, **bold** for element names, \`code\` for technical ids, and tables only when comparing several elements. No HTML.`;
+
+const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', ru: 'Russian' };
+
+/**
+ * Prepended to EVERY message: a resumed agent never sees the system prompt
+ * again, so the layer and the UI language must travel with each turn.
+ */
+export function contextBlock(layer: { name: string } | null, locale: Locale): string {
   const layerLine = layer ? `Current integration layer: "${layer.name}".` : 'No integration layer is selected.';
-  return `<context>\n${layerLine}\n</context>`;
+  const languageLine = `UI language: ${LANGUAGE_NAMES[locale]} (${locale}). Use it for replies and new user-facing text unless the user explicitly asked for another language in this conversation; technical terms stay in English.`;
+  return `<context>\n${layerLine}\n${languageLine}\n</context>`;
 }

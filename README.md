@@ -32,13 +32,18 @@ A chat companion for **[ArchON](https://archon.su)**: describe a change to your 
 
 Cursor agents run on the Cursor SDK, which needs Node.js and therefore cannot run in a browser. Forge talks to the ArchON bridge (`/api/forge/cursor/*`), which starts a Cursor agent with the model you picked and registers every archon-mcp tool as a custom tool. When the agent calls one, the bridge forwards the call to your browser, Forge runs it in the local worker and sends the result back. **Your project never leaves the browser** — the bridge only sees tool calls and their results.
 
-You can point Forge at your own bridge in Settings → Bridge URL.
+### Running your own bridge
+
+By default the bridge is the one ArchON runs. If you would rather not send your Cursor API key and the agent's tool traffic through a server you don't control, run your own bridge and paste its address into **Settings → Bridge URL**. Forge needs no other changes.
+
+**[BRIDGE.md](./BRIDGE.md)** is the full contract a bridge must implement: the four endpoints (`GET /models`, `POST /runs` as an event stream, `POST /runs/{runId}/tool-result`, `POST /runs/{runId}/cancel`), their request and response formats, and the errors, limits and timeouts Forge expects. Each part explains why it works that way. It also lists exactly what data reaches the bridge, covers deployment (Node 22.13+, a reverse proxy without buffering, CORS), and includes a one-file Node server you can start in a few minutes.
 
 ## Privacy
 
 - Your API key is stored only in this browser's `localStorage` and sent with each request. The bridge keeps it in memory for the duration of a run and never stores or logs it.
 - Chat history lives in this browser's `IndexedDB`. Clear it with the trash button in the window header.
 - Nothing Forge stores goes into the project file, so collaborators never see your key or your chat.
+- The bridge sees tool calls and their results, which include the parts of the project the agent reads, and the model runs at Cursor. See [what passes through the bridge](./BRIDGE.md#what-passes-through-the-bridge) and how to [run your own](#running-your-own-bridge).
 
 
 

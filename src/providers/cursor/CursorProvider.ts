@@ -5,7 +5,7 @@
  * and relays each call back here over the run's event stream. The tools
  * themselves still execute in this browser's worker.
  *
- * Wire protocol (see resume/helpers/forgeCursorBridge.ts):
+ * Wire protocol (full contract in BRIDGE.md):
  *   GET  /models                        → { models: ModelDescriptor[] }
  *   POST /runs                          → text/event-stream:
  *        started {runId} · text {text} · thinking {text}

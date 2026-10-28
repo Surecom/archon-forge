@@ -3,6 +3,7 @@ import { readSse } from '../providers/sse';
 import { countChanges } from '../chat/changes';
 import { createTranslator } from '../i18n';
 import { toModelTools } from '../chat/tools';
+import { contextBlock } from '../chat/systemPrompt';
 
 const streamOf = (chunks: string[]): ReadableStream<Uint8Array> => {
   const encoder = new TextEncoder();
@@ -56,5 +57,17 @@ describe('toModelTools', () => {
     const names = toModelTools(['add_systems', 'auto_layout', 'load_project_state', 'get_operations', 'create_project']
       .map(name => ({ name, description: '', inputSchema: {} }))).map(t => t.name);
     expect(names).toEqual(['add_systems']);
+  });
+});
+
+describe('contextBlock', () => {
+  it('carries the layer and the host UI language on every message', () => {
+    const block = contextBlock({ name: 'Payments' }, 'en');
+    expect(block).toContain('Current integration layer: "Payments".');
+    expect(block).toContain('UI language: English (en).');
+  });
+
+  it('names Russian when the host UI is Russian', () => {
+    expect(contextBlock(null, 'ru')).toContain('UI language: Russian (ru).');
   });
 });

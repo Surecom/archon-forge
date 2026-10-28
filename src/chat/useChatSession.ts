@@ -113,7 +113,7 @@ const fromStored = (row: history.StoredMessage): ChatMessage => ({
 
 export function useChatSession(args: Args): UseChatSession {
   const { api, provider, settings, mcp, bridge, readOnly, tab, onAuthError } = args;
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [chats, setChats] = useState<Record<string, TabChat>>({});
   const [runningTabKey, setRunningTabKey] = useState<string | null>(null);
   const tokenRef = useRef(0);
@@ -227,7 +227,7 @@ export function useChatSession(args: Args): UseChatSession {
         {
           systemPrompt: FORGE_SYSTEM_PROMPT,
           history: transcriptOf(transcriptRows),
-          message: `${contextBlock({ name: target.name })}\n\n${text}`,
+          message: `${contextBlock({ name: target.name }, locale)}\n\n${text}`,
           tools: toolsRef.current,
           context: { currentLayerId: target.layerId },
           retry,
@@ -276,7 +276,7 @@ export function useChatSession(args: Args): UseChatSession {
       runningRef.current = null;
       setRunningTabKey(null);
     }
-  }, [api, provider, settings, mcp, bridge, readOnly, sessionFor, onAuthError, patchChat, patchMessage, t]);
+  }, [api, provider, settings, mcp, bridge, readOnly, sessionFor, onAuthError, patchChat, patchMessage, t, locale]);
 
   const chat = (tabKey && chats[tabKey]) || EMPTY_CHAT;
   const messages = chat.messages;
